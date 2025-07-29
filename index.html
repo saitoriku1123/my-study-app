@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src 'self' https://fonts.gstatic.com;">
+    <title>学習管理アプリ</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #007aff; --light-gray: #f2f2f7; --card-bg: #ffffff; --text-color: #1d1d1f;
+            --subtext-color: #6e6e73; --danger-color: #dc3545; --border-color: #e5e5e5; --card-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            --sidebar-bg: #2c3e50; --sidebar-hover: #34495e;
+        }
+        html, body {
+            margin: 0; padding: 0; height: 100vh; overflow: hidden;
+        }
+        body { font-family: 'Noto Sans JP', sans-serif; background-color: var(--light-gray); color: var(--text-color); }
+
+        .app-container { display: flex; height: 100vh; }
+
+        .sidebar {
+            width: 220px; background-color: var(--sidebar-bg); padding: 15px;
+            display: flex; flex-direction: column; flex-shrink: 0;
+        }
+        .sidebar-header { padding: 10px 15px; margin-bottom: 10px; }
+        .sidebar-header h3 { color: white; margin: 0; font-size: 18px; }
+        .nav-link {
+            color: #bdc3c7; text-decoration: none; padding: 12px 15px;
+            border-radius: 8px; margin-bottom: 8px; font-weight: 500;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .nav-link:hover { background-color: var(--sidebar-hover); color: white; }
+        .nav-link.active { background-color: var(--primary-color); color: white; }
+
+        .main-content { flex-grow: 1; overflow-y: auto; height: 100vh; }
+        .page { display: none; }
+        .page.active { display: block; }
+        
+        .container { max-width: 1100px; margin: 20px auto; padding: 20px; }
+        header h1 { font-size: 28px; font-weight: 700; margin-bottom: 20px;}
+        .card { background: var(--card-bg); border-radius: 12px; padding: 20px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px; }
+        .card-header h2 { margin: 0; font-size: 20px; }
+        .add-btn { background-color: var(--primary-color); color: white; border: none; padding: 8px 16px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: background-color 0.2s; }
+        .filter-group { display: flex; gap: 8px; margin-left: auto; margin-right: 16px; }
+        .filter-btn { background: var(--light-gray); color: var(--subtext-color); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+        .filter-btn.active { background: var(--primary-color); color: white; border-color: var(--primary-color); }
+        .stats-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: center; }
+        .stat-item h3 { margin-top: 0; font-size: 16px; color: var(--subtext-color); margin-bottom: 8px; text-align: center; }
+        #total-time { font-size: 32px; font-weight: 700; color: var(--primary-color); text-align: center; }
+        .chart-container { position: relative; height:120px; width:120px; margin: 0 auto; }
+        .large-chart-container { height: 300px; padding-top: 20px; }
+        .main-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; }
+        .column { display: flex; flex-direction: column; gap: 24px; }
+        .task-list, .scope-list { list-style: none; padding: 0; margin: 0; }
+        .scope-item { cursor: pointer; }
+        .task-item, .scope-item { padding: 16px; border: 1px solid var(--border-color); border-radius: 10px; margin-bottom: 12px; display: flex; align-items: flex-start; }
+        .task-item.is-overdue { border-left: 4px solid var(--danger-color); }
+        .task-item .checkbox-col { margin-right: 12px; }
+        .task-item input[type="checkbox"] { width: 20px; height: 20px; margin-top: 2px; }
+        .task-details, .scope-details { flex-grow: 1; }
+        .task-title, .scope-title { font-size: 16px; font-weight: 500; }
+        .task-meta, .scope-meta { font-size: 13px; color: var(--subtext-color); margin-top: 4px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px;}
+        .due-date.is-overdue { color: var(--danger-color); }
+        .subject-tag { font-size: 12px; display: inline-block; padding: 3px 10px; background-color: var(--light-gray); border-radius: 12px; }
+        .linked-scope { font-size: 12px; color: var(--primary-color); margin-top: 4px; }
+        .actions-col { margin-left: auto; display: flex; align-items: center; }
+        .elapsed-time { font-weight: 500; font-size: 16px; }
+        .add-time-btn { font-size: 16px; font-weight: bold; color: var(--subtext-color); width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border-color); background-color: white; cursor: pointer; margin-right: 8px; }
+        .play-btn, .delete-btn, .attach-btn { background: none; border: none; cursor: pointer; font-size: 24px; padding: 0 5px; }
+        .play-btn { color: #28a745; }
+        .delete-btn { color: #6e6e73; z-index: 5; position: relative;}
+        .attach-btn { color: #6e6e73; }
+        .attachment-area { font-size: 12px; margin-top: 8px; }
+        .attachment-link { color: #007bff; text-decoration: none; cursor: pointer; }
+        .summarize-btn { font-size: 12px; padding: 2px 6px; margin-left: 5px; background-color: #17a2b8; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-overlay.is-visible { display: flex; }
+        .modal-content { background: white; padding: 30px; border-radius: 12px; width: 400px; max-height: 80vh; overflow-y: auto; position: relative; box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+        .close-btn { position: absolute; top: 10px; right: 15px; font-size: 28px; cursor: pointer; color: #aaa; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 14px; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-family: inherit; font-size: 14px; }
+        .form-group small { font-size: 12px; color: var(--subtext-color); margin-top: 4px; display: block; }
+        .form-group button { width: 100%; padding: 12px; background-color: var(--primary-color); color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+        .progress-bar-container { background-color: #e9ecef; border-radius: 5px; height: 20px; margin-top: 10px; overflow: hidden; }
+        .progress-bar { background-color: #28a745; height: 100%; width: 0%; display: flex; align-items: center; justify-content: center; color: white; font-size: 12px; transition: width 0.4s ease; }
+        #page-chat #chat-card { height: calc(100vh - 120px); display: flex; flex-direction: column; }
+        .chat-messages { flex-grow: 1; padding: 10px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 6px; margin-bottom: 10px; min-height: 100px; }
+        .chat-message { margin-bottom: 10px; }
+        .chat-message.user { text-align: right; }
+        .message-bubble { display: inline-block; padding: 8px 12px; border-radius: 18px; max-width: 80%; line-height: 1.5; }
+        .chat-message.user .message-bubble { background-color: var(--primary-color); color: white; }
+        .chat-message.ai .message-bubble { background-color: var(--light-gray); color: var(--text-color); }
+        .typing-indicator span { height: 8px; width: 8px; margin: 0 1px; background-color: #999; border-radius: 50%; display: inline-block; animation: bounce 1.4s infinite ease-in-out both; }
+        .typing-indicator span:nth-of-type(1) { animation-delay: -0.32s; }
+        .typing-indicator span:nth-of-type(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1.0); } }
+        .chat-input-form { display: flex; gap: 10px; }
+        .chat-input-form input { flex-grow: 1; border: 1px solid #ccc; border-radius: 18px; padding: 10px 15px; }
+        .chat-input-form button { background: var(--primary-color); border: none; color: white; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; flex-shrink: 0; }
+        #analysis-task-list { list-style: none; padding: 0; margin-top: 16px; }
+        #analysis-task-list li { padding: 8px 0; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+        #analysis-task-list .completed { text-decoration: line-through; color: var(--subtext-color); }
+        #analysis-task-list .status-icon { font-size: 18px; }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+        .setting-toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .setting-toggle label {
+            margin-bottom: 0;
+        }
+        .setting-toggle input[type="checkbox"] {
+            width: 22px;
+            height: 22px;
+            cursor: pointer;
+        }
+        .data-buttons {
+            display: flex;
+            gap: 12px;
+        }
+        .data-buttons .btn-secondary, .data-buttons .btn-danger {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            color: white;
+            font-weight: 500;
+        }
+        .btn-secondary { background-color: var(--subtext-color); }
+        .btn-danger { background-color: var(--danger-color); }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="sidebar-header"><h3>学習メニュー</h3></div>
+            <a href="#" class="nav-link" data-page="page-stats">統計</a>
+            <a href="#" class="nav-link" data-page="page-tasks">タスク</a>
+            <a href="#" class="nav-link" data-page="page-chat">AIチャット</a>
+            <a href="#" class="nav-link" data-page="page-settings">設定</a>
+        </nav>
+        
+        <main class="main-content">
+            <div id="page-stats" class="page">
+                <div class="container">
+                    <header><h1>学習の統計</h1></header>
+                    <div class="card">
+                        <div class="stats-container">
+                            <div class="stat-item"><h3>総勉強時間</h3><p id="total-time">00:00:00</p></div>
+                            <div class="stat-item"><h3>科目別の時間</h3><div class="chart-container"><canvas id="subject-chart"></canvas></div></div>
+                        </div>
+                    </div>
+                    <div class="main-grid">
+                        <div class="column"><div class="card"><div class="card-header"><h2>週間勉強時間</h2></div><div class="large-chart-container"><canvas id="weekly-chart"></canvas></div></div></div>
+                        <div class="column"><div class="card"><div class="card-header"><h2>日次勉強時間 (直近14日間)</h2></div><div class="large-chart-container"><canvas id="daily-chart"></canvas></div></div></div>
+                    </div>
+                </div>
+            </div>
+            <div id="page-tasks" class="page">
+                <div class="container">
+                    <header><h1>タスク管理</h1></header>
+                    <div class="main-grid">
+                        <div class="column"><div class="card"><div class="card-header"><h2>タスク一覧</h2><div class="filter-group"><button class="filter-btn active" data-filter="today">今日まで</button><button class="filter-btn" data-filter="all">すべて</button></div><button class="add-btn" id="add-task-btn">＋ 追加</button></div><ul class="task-list"></ul></div></div>
+                        <div class="column"><div class="card"><div class="card-header"><h2>テスト範囲</h2><button class="add-btn" id="add-scope-btn">＋ 追加</button></div><ul class="scope-list"></ul></div></div>
+                    </div>
+                </div>
+            </div>
+            <div id="page-chat" class="page">
+                <div class="container">
+                    <header><h1>AIアシスタント</h1></header>
+                    <div class="card" id="chat-card"><div class="chat-messages"></div><form class="chat-input-form"><input type="text" placeholder="質問を入力..."><button type="submit">➤</button></form></div>
+                </div>
+            </div>
+            <div id="page-settings" class="page">
+                <div class="container">
+                    <header><h1>設定</h1></header>
+                    <div class="settings-grid">
+                        <div class="card">
+                            <div class="card-header"><h2>APIキー設定</h2></div>
+                            <div class="form-group">
+                                <label for="api-key-input">Google AI APIキー</label>
+                                <input type="password" id="api-key-input" placeholder="ご自身のAPIキーを入力してください">
+                                <small>APIキーはローカルに保存され、外部には送信されません。</small>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><h2>通知設定</h2></div>
+                            <div class="form-group setting-toggle">
+                                <label for="notification-toggle">期日タスクの通知を有効にする</label>
+                                <input type="checkbox" id="notification-toggle">
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header"><h2>データ管理</h2></div>
+                            <div class="data-buttons">
+                                <button id="export-data-btn" class="btn-secondary">エクスポート</button>
+                                <button id="import-data-btn" class="btn-secondary">インポート</button>
+                                <button id="delete-data-btn" class="btn-danger">全データ削除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="task-modal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span><h2>新しいタスク</h2>
+            <form id="add-task-form"><div class="form-group"><label for="task-due-date-input">期日</label><input type="date" id="task-due-date-input"></div><div class="form-group"><label for="task-title-input">タスク名</label><input type="text" id="task-title-input" required></div><div class="form-group"><label for="task-subject-input">科目</label><input type="text" id="task-subject-input" required></div><div class="form-group"><label for="task-scope-select">関連テスト</label><select id="task-scope-select"><option value="">なし</option></select></div><div class="form-group"><button type="submit">追加する</button></div></form>
+        </div>
+    </div>
+    <div id="scope-modal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span><h2>新しいテスト範囲</h2>
+            <form id="add-scope-form"><div class="form-group"><label for="scope-test-name-input">試験名</label><input type="text" id="scope-test-name-input" required></div><div class="form-group"><label for="scope-subject-input">科目</label><input type="text" id="scope-subject-input" required></div><div class="form-group"><label for="scope-details-input">範囲詳細</label><textarea id="scope-details-input" rows="4"></textarea></div><div class="form-group"><button type="submit">追加する</button></div></form>
+        </div>
+    </div>
+    <div id="analysis-modal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span><h2 id="analysis-title">進捗詳細</h2><ul id="analysis-task-list"></ul>
+        </div>
+    </div>
+    <div id="add-time-modal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span><h2>勉強時間を追加</h2>
+            <form id="add-time-form"><div class="form-group"><label for="minutes-to-add-input">追加する時間（分）</label><input type="number" id="minutes-to-add-input" value="30" required></div><div class="form-group"><button type="submit">時間を追加</button></div></form>
+        </div>
+    </div>
+    
+    <script src="./renderer.js"></script>
+</body>
+</html>
